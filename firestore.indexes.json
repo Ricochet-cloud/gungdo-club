@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "shootingRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "playerId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "shootingRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "ASCENDING" },
+        { "fieldPath": "round", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

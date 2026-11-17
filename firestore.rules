@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// ⚠️ ADMIN_UID 를 Firebase 콘솔 > Authentication 에서 만든 관리자 계정의 UID로 바꿔주세요.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.uid == 'ADMIN_UID';
+    }
+
+    // ── 선수 ──────────────────────────────────────
+    match /players/{playerId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.status in ['active', 'inactive'];
+      allow delete: if false; // 삭제 대신 비활성화
+    }
+
+    // ── 회차별 기록 ────────────────────────────────
+    // 문서 ID 규칙: {date}_{playerId}_{round}  → 중복 기록이 구조적으로 불가능
+    match /shootingRecords/{recordId} {
+
+      function d() { return request.resource.data; }
+
+      function validShape() {
+        return d().date is string && d().date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+          && d().playerId is string
+          && d().round is int && d().round >= 1 && d().round <= 3
+          && d().arrowsShot == 5
+          && d().hits is int && d().hits >= 0 && d().hits <= 5
+          && d().deleted is bool
+          && recordId == d().date + '_' + d().playerId + '_' + string(d().round);
+      }
+
+      // 이전 회차가 존재하고 삭제되지 않았어야 다음 회차 입력 가능 (1→2→3 순서 강제)
+      function prevRoundExists() {
+        let prevPath = /databases/$(database)/documents/shootingRecords/$(d().date + '_' + d().playerId + '_' + string(d().round - 1));
+        return d().round == 1
+          || (exists(prevPath) && get(prevPath).data.deleted == false);
+      }
+
+      allow read: if isAdmin();
+      allow create: if isAdmin() && validShape() && d().deleted == false && prevRoundExists();
+      allow update: if isAdmin() && validShape()
+        // 식별 필드는 변경 불가
+        && d().date == resource.data.date
+        && d().playerId == resource.data.playerId
+        && d().round == resource.data.round
+        // 되살리기(삭제→복구)도 순서 규칙 적용
+        && (d().deleted == true || prevRoundExists());
+      allow delete: if false; // soft delete만 허용
+    }
+  }
+}

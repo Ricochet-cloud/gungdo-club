@@ -1,5 +1,6 @@
 // 기록 조회 (뼈대) — 날짜별 / 선수별 탭
-import { todayKST, formatDateKR } from "../utils.js";
+import { todayKST, formatDateKR, escapeHTML } from "../utils.js";
+import { fetchPlayers } from "../data/players.js";
 
 export async function render(view, params) {
   const date = params.date || todayKST();
@@ -16,6 +17,16 @@ export async function render(view, params) {
   if (tab === "date") {
     view.querySelector("#hist-date").addEventListener("change", (e) => {
       location.hash = `#/history?tab=date&date=${e.target.value}`;
+    });
+  } else {
+    // 선수 목록 채우기 (비활성 선수도 과거 기록 조회 가능)
+    const select = view.querySelector("#hist-player");
+    const players = await fetchPlayers();
+    select.innerHTML = `<option value="">선수를 선택하세요</option>` + players.map((p) =>
+      `<option value="${p.id}" ${p.id === params.player ? "selected" : ""}>${escapeHTML(p.name)}${p.status !== "active" ? " (비활성)" : ""}</option>`
+    ).join("");
+    select.addEventListener("change", (e) => {
+      location.hash = `#/history?tab=player&player=${e.target.value}`;
     });
   }
   return () => {};

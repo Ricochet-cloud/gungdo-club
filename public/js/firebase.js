@@ -4,7 +4,10 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
   setPersistence, browserLocalPersistence,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getFirestore, collection, doc, addDoc, setDoc, updateDoc, getDoc, getDocs,
+  onSnapshot, query, where, orderBy, limit, serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 export const app = initializeApp(firebaseConfig);
@@ -15,3 +18,7 @@ export const db = getFirestore(app);
 setPersistence(auth, browserLocalPersistence);
 
 export { onAuthStateChanged, signInWithEmailAndPassword, signOut };
+export {
+  collection, doc, addDoc, setDoc, updateDoc, getDoc, getDocs,
+  onSnapshot, query, where, orderBy, limit, serverTimestamp,
+};

@@ -249,3 +249,49 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green-2); o
   .toolbar select, .toolbar .btn { flex: 1 1 auto; }
   .toast { bottom: calc(var(--tabbar-h) + 16px); }
 }
+
+/* ============ 선수 관리 ============ */
+.card-flush { padding: 0; overflow: hidden; }
+.list-count { margin: -6px 2px -8px; font-size: 13px; }
+.player-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 14px 20px; border-bottom: 1px solid var(--line);
+}
+.player-item:last-child { border-bottom: none; }
+.player-item.is-inactive { background: var(--ivory); }
+.player-item.is-inactive .player-name strong { color: var(--muted); }
+.player-main { min-width: 0; flex: 1; }
+.player-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.player-name strong { font-size: 16px; }
+.player-sub { font-size: 13px; margin-top: 2px; }
+.player-memo {
+  font-size: 13px; margin-top: 6px; color: var(--ink);
+  background: var(--ivory); border-radius: 8px; padding: 6px 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.player-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.player-actions .btn { display: inline-grid; place-items: center; }
+.badge-warn { background: #fbefd3; color: #8a6414; }
+
+/* ── 다이얼로그 ── */
+.dialog {
+  border: none; border-radius: 18px; padding: 24px; width: min(440px, calc(100vw - 32px));
+  background: var(--paper); color: var(--ink); box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+}
+.dialog::backdrop { background: rgba(35, 39, 31, 0.45); }
+.dialog h2 { font-size: 18px; margin-bottom: 4px; }
+.dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.dialog-actions .btn { min-width: 90px; }
+.req { color: var(--danger); font-style: normal; }
+textarea { padding: 12px 14px; min-height: 84px; resize: vertical; line-height: 1.5; }
+.field small { font-size: 12px; }
+
+@media (max-width: 720px) {
+  .player-item { flex-direction: column; align-items: stretch; padding: 14px 16px; gap: 10px; }
+  .player-actions { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .player-actions .btn { min-height: 42px; }
+  /* 모바일: 다이얼로그를 하단 시트처럼 */
+  .dialog { margin: auto auto 0; width: 100%; max-width: 100%; border-radius: 18px 18px 0 0;
+    padding: 22px 18px calc(18px + env(safe-area-inset-bottom)); max-height: 92vh; }
+  .dialog-actions .btn { flex: 1; }
+}

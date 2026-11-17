@@ -5,7 +5,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function isAdmin() {
-      return request.auth != null && request.auth.uid == 'ADMIN_UID';
+      return request.auth != null && request.auth.uid == 'xu7Kuebd4lYzVgimZuIDpw4d3uR2';
     }
 
     // ── 선수 ──────────────────────────────────────
@@ -14,6 +14,7 @@ service cloud.firestore {
       allow create, update: if isAdmin()
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 20
         && request.resource.data.status in ['active', 'inactive'];
       allow delete: if false; // 삭제 대신 비활성화
     }

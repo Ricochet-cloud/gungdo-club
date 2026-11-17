@@ -42,6 +42,14 @@ service cloud.firestore {
           || (exists(prevPath) && get(prevPath).data.deleted == false);
       }
 
+      // 다음 회차가 살아있으면 이 회차는 삭제 불가 (마지막 회차만 삭제)
+      function nextRoundInactive() {
+        let nextPath = /databases/$(database)/documents/shootingRecords/$(d().date + '_' + d().playerId + '_' + string(d().round + 1));
+        return d().round == 3
+          || !exists(nextPath)
+          || get(nextPath).data.deleted == true;
+      }
+
       allow read: if isAdmin();
       allow create: if isAdmin() && validShape() && d().deleted == false && prevRoundExists();
       allow update: if isAdmin() && validShape()
@@ -50,7 +58,7 @@ service cloud.firestore {
         && d().playerId == resource.data.playerId
         && d().round == resource.data.round
         // 되살리기(삭제→복구)도 순서 규칙 적용
-        && (d().deleted == true || prevRoundExists());
+        && (d().deleted == true ? nextRoundInactive() : prevRoundExists());
       allow delete: if false; // soft delete만 허용
     }
   }

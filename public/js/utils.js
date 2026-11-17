@@ -32,8 +32,8 @@ export function formatRate(rate) {
 /**
  * 하루 기록(회차 문서 배열)을 선수별로 묶고 순위를 매긴다.
  * - deleted 기록 제외
- * - 정렬: 총 명중 내림차순, 같으면 공동 순위
- * - 3회차 미완료 선수는 complete=false 로 표시 (순위는 매기되 '진행중' 표기용)
+ * - 3회차를 모두 마친 선수만 순위 부여 (총 명중 내림차순, 같으면 공동 순위)
+ * - 미완료 선수는 rank=null, complete=false 로 순위표 아래에 '진행중' 표시
  */
 export function buildDailyRanking(records) {
   const byPlayer = new Map();
@@ -52,16 +52,46 @@ export function buildDailyRanking(records) {
     ...p,
     rate: hitRate(p.hits, p.arrows),
     complete: ROUNDS.every((n) => p.rounds[n] != null),
+    rank: null,
   }));
 
-  list.sort((a, b) => b.hits - a.hits || a.playerName.localeCompare(b.playerName, "ko"));
+  list.sort((a, b) =>
+    (b.complete - a.complete) || (b.hits - a.hits) || a.playerName.localeCompare(b.playerName, "ko"));
 
   let rank = 0;
-  list.forEach((p, i) => {
-    if (i === 0 || p.hits !== list[i - 1].hits) rank = i + 1;
+  list.filter((p) => p.complete).forEach((p, i, arr) => {
+    if (i === 0 || p.hits !== arr[i - 1].hits) rank = i + 1;
     p.rank = rank;
   });
   return list;
+}
+
+/** 'YYYY-MM-DD' 에 n일 더하기 */
+export function addDays(ymd, n) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + n));
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Firestore Timestamp → 오늘이면 "14:05", 아니면 "11/16 14:05" (KST) */
+export function formatTime(ts) {
+  const date = ts?.toDate ? ts.toDate() : typeof ts === "number" ? new Date(ts) : null;
+  if (!date) return "";
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date).map((p) => [p.type, p.value]));
+  const ymd = `${parts.year}-${parts.month}-${parts.day}`;
+  const hm = `${parts.hour}:${parts.minute}`;
+  return ymd === todayKST() ? hm : `${Number(parts.month)}/${Number(parts.day)} ${hm}`;
+}
+
+/** 동명이인이면 "김철수 (2222)" 처럼 연락처 뒷자리(없으면 가입일)를 붙인다 */
+export function displayName(player, allPlayers = []) {
+  const dup = allPlayers.filter((x) => x.name === player.name).length > 1;
+  if (!dup) return player.name;
+  const tail = player.phone ? player.phone.replace(/\D/g, "").slice(-4) : player.joinedAt;
+  return `${player.name} (${tail})`;
 }
 
 // ── DOM 헬퍼 ─────────────────────────────────────

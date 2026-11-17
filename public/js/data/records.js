@@ -2,7 +2,7 @@
 // 문서 ID = {date}_{playerId}_{round} → 같은 선수·날짜·회차는 문서가 하나뿐
 import {
   db, auth, collection, doc, setDoc, updateDoc,
-  onSnapshot, query, where, serverTimestamp,
+  onSnapshot, query, where, orderBy, limit, getDocs, serverTimestamp,
 } from "../firebase.js";
 import { recordId, ARROWS_PER_ROUND } from "../utils.js";
 
@@ -16,6 +16,22 @@ export function watchRecordsByDate(date, onChange, onError) {
     (snap) => onChange(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     (err) => { console.error(err); onError?.(err); }
   );
+}
+
+/** 최근 수정된 기록 n개 실시간 구독 (삭제된 기록은 화면에서 거름) */
+export function watchRecentRecords(n, onChange, onError) {
+  const q = query(col(), orderBy("updatedAt", "desc"), limit(n));
+  return onSnapshot(
+    q,
+    (snap) => onChange(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => { console.error(err); onError?.(err); }
+  );
+}
+
+/** 선수 한 명의 전체 기록 (단일 필드 조건 → 복합 인덱스 불필요, 정렬은 화면에서) */
+export async function fetchRecordsByPlayer(playerId) {
+  const snap = await getDocs(query(col(), where("playerId", "==", playerId)));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => !r.deleted);
 }
 
 /**

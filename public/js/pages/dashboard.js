@@ -1,6 +1,7 @@
 // 대시보드 — 오늘 요약 통계 · 순위 · 입력 현황 · 최근 기록 (실시간)
 import { watchPlayers } from "../data/players.js";
 import { watchRecordsByDate, watchRecentRecords, groupByPlayer } from "../data/records.js";
+import { watchPracticeByDate, summarizePractice } from "../data/practice.js";
 import {
   todayKST, formatDateKR, formatTime, ROUNDS, hitRate, formatRate,
   buildDailyRanking, escapeHTML, toast, displayName,
@@ -10,7 +11,7 @@ const RECENT_LIMIT = 10;
 
 export async function render(view) {
   const date = todayKST();
-  const state = { players: null, records: null, recent: null };
+  const state = { players: null, records: null, recent: null, practice: null };
 
   view.innerHTML = `
     <div class="page-head">
@@ -66,7 +67,22 @@ export async function render(view) {
       statCard("오늘 참여", ready ? participants : "—", "명"),
       statCard("오늘 총 명중", ready ? hits : "—", "중"),
       statCard("오늘 명중률", ready ? formatRate(hitRate(hits, arrows)) : "—", ""),
+      practiceCard(),
     ].join("");
+  }
+
+  function practiceCard() {
+    if (!state.practice) return statCard("오늘 연습", "—", "");
+    const list = Object.values(summarizePractice(state.practice));
+    const pArrows = list.reduce((s, p) => s + p.arrows, 0);
+    const pHits = list.reduce((s, p) => s + p.hits, 0);
+    const sub = list.length ? `${pArrows}발 · ${formatRate(hitRate(pHits, pArrows))}` : "기록 없음";
+    return `
+      <a class="stat-card stat-card-practice" href="#/records?date=${date}&mode=practice">
+        <span class="stat-label">오늘 연습</span>
+        <span class="stat-value">${list.length}<small>명</small></span>
+        <span class="stat-sub">${sub}</span>
+      </a>`;
   }
 
   // ── 오늘의 순위 ────────────────────────────
@@ -135,6 +151,7 @@ export async function render(view) {
     watchPlayers((p) => { state.players = p; renderAll(); }, onErr),
     watchRecordsByDate(date, (r) => { state.records = r; renderAll(); }, onErr),
     watchRecentRecords(RECENT_LIMIT, (r) => { state.recent = r; renderRecent(); }, onErr),
+    watchPracticeByDate(date, (r) => { state.practice = r; renderStats(); }, onErr),
   ];
 
   return () => unsubs.forEach((u) => u());

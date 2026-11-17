@@ -5,7 +5,52 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function isAdmin() {
-      return request.auth != null && request.auth.uid == 'xu7Kuebd4lYzVgimZuIDpw4d3uR2';
+      return request.auth != null && request.auth.uid == 'ADMIN_UID';
+    }
+
+    // ── 회차 기록 공통 검사 (공식·연습 공용) ─────────
+    // 문서 ID 규칙: {date}_{playerId}_{round}  → 중복 기록이 구조적으로 불가능
+    function validRound(d, recordId, maxRound) {
+      return d.date is string && d.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && d.playerId is string
+        && d.round is int && d.round >= 1 && d.round <= maxRound
+        && d.arrowsShot == 5
+        && d.hits is int && d.hits >= 0 && d.hits <= 5
+        && d.deleted is bool
+        && recordId == d.date + '_' + d.playerId + '_' + string(d.round);
+    }
+
+    function roundPath(coll, d, round) {
+      return /databases/$(database)/documents/$(coll)/$(d.date + '_' + d.playerId + '_' + string(round));
+    }
+
+    // 이전 회차가 존재하고 삭제되지 않았어야 다음 회차 입력 가능 (1→2→3… 순서 강제)
+    function prevRoundExists(coll, d) {
+      return d.round == 1
+        || (exists(roundPath(coll, d, d.round - 1)) && get(roundPath(coll, d, d.round - 1)).data.deleted == false);
+    }
+
+    // 다음 회차가 살아있으면 이 회차는 삭제 불가 (마지막 회차만 삭제)
+    function nextRoundInactive(coll, d, maxRound) {
+      return d.round == maxRound
+        || !exists(roundPath(coll, d, d.round + 1))
+        || get(roundPath(coll, d, d.round + 1)).data.deleted == true;
+    }
+
+    function canCreate(coll, recordId, maxRound) {
+      let d = request.resource.data;
+      return isAdmin() && validRound(d, recordId, maxRound) && d.deleted == false && prevRoundExists(coll, d);
+    }
+
+    function canUpdate(coll, recordId, maxRound) {
+      let d = request.resource.data;
+      return isAdmin() && validRound(d, recordId, maxRound)
+        // 식별 필드는 변경 불가
+        && d.date == resource.data.date
+        && d.playerId == resource.data.playerId
+        && d.round == resource.data.round
+        // 삭제 시엔 마지막 회차인지, 입력/복구 시엔 이전 회차가 있는지
+        && (d.deleted == true ? nextRoundInactive(coll, d, maxRound) : prevRoundExists(coll, d));
     }
 
     // ── 선수 ──────────────────────────────────────
@@ -19,47 +64,20 @@ service cloud.firestore {
       allow delete: if false; // 삭제 대신 비활성화
     }
 
-    // ── 회차별 기록 ────────────────────────────────
-    // 문서 ID 규칙: {date}_{playerId}_{round}  → 중복 기록이 구조적으로 불가능
+    // ── 공식 기록: 하루 3회차 ─────────────────────
     match /shootingRecords/{recordId} {
-
-      function d() { return request.resource.data; }
-
-      function validShape() {
-        return d().date is string && d().date.matches('^\\d{4}-\\d{2}-\\d{2}$')
-          && d().playerId is string
-          && d().round is int && d().round >= 1 && d().round <= 3
-          && d().arrowsShot == 5
-          && d().hits is int && d().hits >= 0 && d().hits <= 5
-          && d().deleted is bool
-          && recordId == d().date + '_' + d().playerId + '_' + string(d().round);
-      }
-
-      // 이전 회차가 존재하고 삭제되지 않았어야 다음 회차 입력 가능 (1→2→3 순서 강제)
-      function prevRoundExists() {
-        let prevPath = /databases/$(database)/documents/shootingRecords/$(d().date + '_' + d().playerId + '_' + string(d().round - 1));
-        return d().round == 1
-          || (exists(prevPath) && get(prevPath).data.deleted == false);
-      }
-
-      // 다음 회차가 살아있으면 이 회차는 삭제 불가 (마지막 회차만 삭제)
-      function nextRoundInactive() {
-        let nextPath = /databases/$(database)/documents/shootingRecords/$(d().date + '_' + d().playerId + '_' + string(d().round + 1));
-        return d().round == 3
-          || !exists(nextPath)
-          || get(nextPath).data.deleted == true;
-      }
-
       allow read: if isAdmin();
-      allow create: if isAdmin() && validShape() && d().deleted == false && prevRoundExists();
-      allow update: if isAdmin() && validShape()
-        // 식별 필드는 변경 불가
-        && d().date == resource.data.date
-        && d().playerId == resource.data.playerId
-        && d().round == resource.data.round
-        // 되살리기(삭제→복구)도 순서 규칙 적용
-        && (d().deleted == true ? nextRoundInactive() : prevRoundExists());
+      allow create: if canCreate('shootingRecords', recordId, 3);
+      allow update: if canUpdate('shootingRecords', recordId, 3);
       allow delete: if false; // soft delete만 허용
+    }
+
+    // ── 연습 기록: 하루 최대 50회차, 순위 미반영 ──
+    match /practiceRecords/{recordId} {
+      allow read: if isAdmin();
+      allow create: if canCreate('practiceRecords', recordId, 50);
+      allow update: if canUpdate('practiceRecords', recordId, 50);
+      allow delete: if false;
     }
   }
 }

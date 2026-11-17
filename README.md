@@ -50,6 +50,7 @@ gungdo-club/
 | 삭제 | soft delete (`deleted: true`, `deletedAt`). 실제 문서 삭제는 규칙으로 차단 |
 | 이름 변경 | 과거 기록의 `playerName`은 당시 이름 그대로 유지 |
 | 설정 메뉴 | MVP에서 제외. 로그아웃은 사이드바/상단에 배치 |
+| 연습 기록 | `practiceRecords`에 별도 저장. 회차 제한 없음(하루 최대 50), 5발 고정, 순위 미반영, 통계 분리 |
 
 ## 데이터 구조
 
@@ -61,6 +62,8 @@ shootingRecords/{date}_{playerId}_{round}
   playerId, playerName, date('YYYY-MM-DD', KST), round(1~3),
   arrowsShot(5), hits(0~5), deleted(bool), deletedAt,
   createdAt, updatedAt, createdBy
+
+practiceRecords/{date}_{playerId}_{round}   ← 연습 (구조 동일, round 1~50)
 ```
 
 ## 진행 상황
@@ -70,3 +73,4 @@ shootingRecords/{date}_{playerId}_{round}
 - [x] 3단계: 기록 입력 (회차 저장, 순서 검사, 수정/삭제)
 - [x] 4단계: 대시보드 · 순위 실시간 연결
 - [x] 5단계: 기록 조회 (날짜별 / 선수별 + 추이 그래프)
+- [x] 6단계: 연습 기록 (입력 / 날짜별·선수별 조회 / 대시보드 카드)

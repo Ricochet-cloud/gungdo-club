@@ -1,10 +1,11 @@
 // 기록 조회 — 날짜별 순위표 / 선수별 기록 이력 + 추이 그래프
 import { fetchPlayers } from "../data/players.js";
 import { watchRecordsByDate, fetchRecordsByPlayer } from "../data/records.js";
+import { watchPracticeByDate, fetchPracticeByPlayer, summarizePractice } from "../data/practice.js";
 import { rankingRows } from "./dashboard.js";
 import {
   todayKST, formatDateKR, addDays, ROUNDS, ARROWS_PER_ROUND, MAX_ARROWS_PER_DAY,
-  hitRate, formatRate, buildDailyRanking, escapeHTML, toast,
+  hitRate, formatRate, buildDailyRanking, escapeHTML, toast, displayName,
 } from "../utils.js";
 
 const CHART_DAYS = 30;
@@ -22,7 +23,7 @@ export async function render(view, params) {
     <div id="tab-body"></div>
   `;
   const body = view.querySelector("#tab-body");
-  return tab === "date" ? renderByDate(body, date, today) : renderByPlayer(body, params.player);
+  return tab === "date" ? renderByDate(body, date, today) : renderByPlayer(body, params.player, params.kind === "practice" ? "practice" : "official");
 }
 
 // ════════════════ 날짜별 ════════════════
@@ -51,6 +52,11 @@ async function renderByDate(body, date, today) {
         </table>
       </div>
     </section>
+
+    <section class="card">
+      <div class="card-head"><h2>이날 연습</h2><span class="badge badge-practice">순위 미반영</span></div>
+      <ul class="status-list" id="day-practice"><li class="empty">불러오는 중…</li></ul>
+    </section>
   `;
 
   const $ = (s) => body.querySelector(s);
@@ -60,7 +66,7 @@ async function renderByDate(body, date, today) {
   $("#to-today")?.addEventListener("click", () => go(today));
 
   let players = [];
-  fetchPlayers().then((p) => { players = p; draw(); }).catch(() => {});
+  fetchPlayers().then((p) => { players = p; draw(); drawPractice?.(); }).catch(() => {});
 
   let records = null;
   function draw() {
@@ -82,19 +88,44 @@ async function renderByDate(body, date, today) {
       : `<tr><td colspan="7" class="empty">이 날짜에는 기록이 없습니다.</td></tr>`;
   }
 
-  const unsub = watchRecordsByDate(date, (r) => { records = r; draw(); },
-    () => toast("기록을 불러오지 못했습니다.", "error"));
-  return unsub;
+  let practice = null;
+  function drawPractice() {
+    if (!practice) return;
+    const list = Object.values(summarizePractice(practice)).sort((a, b) => b.rounds.length - a.rounds.length);
+    $("#day-practice").innerHTML = list.length ? list.map((p) => {
+      const pl = players.find((x) => x.id === p.playerId);
+      return `
+        <li class="practice-row">
+          <a class="name-link" href="#/history?tab=player&player=${p.playerId}&kind=practice">${escapeHTML(pl ? displayName(pl, players) : p.playerName)}</a>
+          <span class="muted">${p.rounds.length}회차 · ${p.hits}/${p.arrows}발</span>
+          <strong>${formatRate(p.rate)}</strong>
+          <span class="mini-chips">${p.rounds.map((r) => `<span class="mini-chip hits-${r.hits}">${r.hits}</span>`).join("")}</span>
+        </li>`;
+    }).join("") : `<li class="empty">이 날짜에는 연습 기록이 없습니다.</li>`;
+  }
+
+  const unsubs = [
+    watchRecordsByDate(date, (r) => { records = r; draw(); },
+      () => toast("기록을 불러오지 못했습니다.", "error")),
+    watchPracticeByDate(date, (r) => { practice = r; drawPractice(); },
+      () => toast("연습 기록을 불러오지 못했습니다.", "error")),
+  ];
+  return () => unsubs.forEach((u) => u());
 }
 
 // ════════════════ 선수별 ════════════════
-async function renderByPlayer(body, playerId) {
+async function renderByPlayer(body, playerId, kind) {
   body.innerHTML = `
     <section class="card">
       <label class="field">
         <span>선수 선택</span>
         <select id="hist-player"><option value="">불러오는 중…</option></select>
       </label>
+      ${playerId ? `
+      <div class="tabs kind-tabs" role="tablist">
+        <a role="tab" class="tab ${kind === "official" ? "active" : ""}" href="#/history?tab=player&player=${playerId}">공식 기록</a>
+        <a role="tab" class="tab ${kind === "practice" ? "active" : ""}" href="#/history?tab=player&player=${playerId}&kind=practice">연습 기록</a>
+      </div>` : ""}
     </section>
     <div id="player-body"></div>
   `;
@@ -111,7 +142,7 @@ async function renderByPlayer(body, playerId) {
     `<option value="${p.id}" ${p.id === playerId ? "selected" : ""}>${escapeHTML(p.name)}${p.phone && players.filter((x) => x.name === p.name).length > 1 ? ` (${p.phone.replace(/\D/g, "").slice(-4)})` : ""}${p.status !== "active" ? " · 비활성" : ""}</option>`
   ).join("");
   select.addEventListener("change", (e) => {
-    location.hash = `#/history?tab=player${e.target.value ? `&player=${e.target.value}` : ""}`;
+    location.hash = `#/history?tab=player${e.target.value ? `&player=${e.target.value}` : ""}${kind === "practice" ? "&kind=practice" : ""}`;
   });
 
   const player = players.find((p) => p.id === playerId);
@@ -119,6 +150,8 @@ async function renderByPlayer(body, playerId) {
     out.innerHTML = `<section class="card"><div class="empty">선수를 선택하면 기록 이력과 추이 그래프가 표시됩니다.</div></section>`;
     return;
   }
+
+  if (kind === "practice") return renderPlayerPractice(out, player);
 
   out.innerHTML = `<section class="card"><div class="empty">불러오는 중…</div></section>`;
   let records = [];
@@ -182,36 +215,107 @@ async function renderByPlayer(body, playerId) {
     </section>
   `;
 
-  drawTrend(out.querySelector("#trend"), [...completeDays].reverse().slice(-CHART_DAYS));
+  drawTrend(out.querySelector("#trend"), [...completeDays].reverse().slice(-CHART_DAYS), {
+    value: (p) => p.hits, max: MAX_ARROWS_PER_DAY, ticks: [0, 5, 10, 15],
+    tip: (p) => `<span>${p.hits}중 / ${p.arrows}발 · ${formatRate(p.rate)}</span>
+      <span class="muted">${ROUNDS.map((n) => `${n}회 ${p.rounds[n]}`).join(" · ")}</span>`,
+    empty: "3회차를 모두 마친 날이 생기면 그래프가 표시됩니다.",
+    label: "하루 총 명중 추이",
+  });
+}
+
+// ── 선수별 연습 기록 ──
+async function renderPlayerPractice(out, player) {
+  out.innerHTML = `<section class="card"><div class="empty">불러오는 중…</div></section>`;
+  let records = [];
+  try {
+    records = await fetchPracticeByPlayer(player.id);
+  } catch (err) {
+    console.error(err);
+    out.innerHTML = `<section class="card"><div class="empty">연습 기록을 불러오지 못했습니다.</div></section>`;
+    return;
+  }
+  const byDate = new Map();
+  for (const r of records) {
+    if (!byDate.has(r.date)) byDate.set(r.date, { date: r.date, rounds: [], hits: 0, arrows: 0 });
+    const d = byDate.get(r.date);
+    d.rounds.push(r);
+    d.hits += r.hits;
+    d.arrows += r.arrowsShot;
+  }
+  const days = [...byDate.values()].map((d) => ({
+    ...d, rounds: d.rounds.sort((a, b) => a.round - b.round), rate: hitRate(d.hits, d.arrows),
+  })).sort((a, b) => b.date.localeCompare(a.date));
+
+  const totalHits = days.reduce((s, d) => s + d.hits, 0);
+  const totalArrows = days.reduce((s, d) => s + d.arrows, 0);
+  const totalRounds = days.reduce((s, d) => s + d.rounds.length, 0);
+  const bestRate = days.reduce((m, d) => (d.rate > (m?.rate ?? -1) ? d : m), null);
+
+  out.innerHTML = `
+    <section class="stat-grid">
+      ${stat("연습 일수", days.length, "일")}
+      ${stat("총 회차", totalRounds, "회")}
+      ${stat("총 발수", totalArrows, "발")}
+      ${stat("연습 명중률", formatRate(hitRate(totalHits, totalArrows)), "")}
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>연습 명중률 추이</h2>
+        <span class="muted small">최근 ${CHART_DAYS}일 · 하루 명중률</span>
+      </div>
+      <div class="chart" id="trend"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>날짜별 연습</h2>${bestRate ? `<span class="muted small">최고 ${formatRate(bestRate.rate)} · ${bestRate.date}</span>` : ""}</div>
+      <ul class="status-list">${days.length ? days.map((d) => `
+        <li class="practice-row">
+          <a class="name-link" href="#/history?tab=date&date=${d.date}">${d.date}</a>
+          <span class="muted">${d.rounds.length}회차 · ${d.hits}/${d.arrows}발</span>
+          <strong>${formatRate(d.rate)}</strong>
+          <span class="mini-chips">${d.rounds.map((r) => `<span class="mini-chip hits-${r.hits}">${r.hits}</span>`).join("")}</span>
+        </li>`).join("") : `<li class="empty">아직 연습 기록이 없습니다.</li>`}
+      </ul>
+    </section>
+  `;
+
+  drawTrend(out.querySelector("#trend"), [...days].reverse().slice(-CHART_DAYS), {
+    value: (p) => p.rate, max: 100, ticks: [0, 25, 50, 75, 100], unit: "%",
+    tip: (p) => `<span>${formatRate(p.rate)} · ${p.hits}/${p.arrows}발</span><span class="muted">${p.rounds.length}회차</span>`,
+    empty: "연습 기록이 생기면 그래프가 표시됩니다.",
+    label: "연습 명중률 추이",
+  });
 }
 
 // ── 추이 그래프 (단일 계열 SVG 라인 + 호버 툴팁) ──
-function drawTrend(el, points) {
+function drawTrend(el, points, opt) {
   if (points.length === 0) {
-    el.innerHTML = `<div class="empty">3회차를 모두 마친 날이 생기면 그래프가 표시됩니다.</div>`;
+    el.innerHTML = `<div class="empty">${opt.empty}</div>`;
     return;
   }
-  const W = 640, H = 220, padL = 32, padR = 16, padT = 16, padB = 28;
+  const W = 640, H = 220, padL = 36, padR = 16, padT = 16, padB = 28;
   const iw = W - padL - padR, ih = H - padT - padB;
-  const maxY = MAX_ARROWS_PER_DAY;
   const x = (i) => padL + (points.length === 1 ? iw / 2 : (i / (points.length - 1)) * iw);
-  const y = (v) => padT + ih - (v / maxY) * ih;
+  const y = (v) => padT + ih - (v / opt.max) * ih;
+  const val = (p) => opt.value(p);
 
-  const grid = [0, 5, 10, 15].map((v) => `
+  const grid = opt.ticks.map((v) => `
     <line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" class="grid-line" />
-    <text x="${padL - 8}" y="${y(v) + 4}" class="axis-label" text-anchor="end">${v}</text>`).join("");
+    <text x="${padL - 8}" y="${y(v) + 4}" class="axis-label" text-anchor="end">${v}${opt.unit && v === opt.max ? opt.unit : ""}</text>`).join("");
 
   const labelIdx = points.length <= 6 ? points.map((_, i) => i) : [0, Math.floor((points.length - 1) / 2), points.length - 1];
   const xLabels = labelIdx.map((i) =>
     `<text x="${x(i)}" y="${H - 8}" class="axis-label" text-anchor="middle">${points[i].date.slice(5).replace("-", "/")}</text>`).join("");
 
-  const path = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.hits).toFixed(1)}`).join(" ");
-  const dots = points.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.hits)}" r="4" class="trend-dot" data-i="${i}" />`).join("");
+  const path = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(val(p)).toFixed(1)}`).join(" ");
+  const dots = points.map((p, i) => `<circle cx="${x(i)}" cy="${y(val(p))}" r="4" class="trend-dot" data-i="${i}" />`).join("");
   const step = points.length > 1 ? iw / (points.length - 1) : iw;
   const hits = points.map((p, i) => `<rect x="${x(i) - step / 2}" y="${padT}" width="${step}" height="${ih}" fill="transparent" data-i="${i}" />`).join("");
 
   el.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" class="trend-svg" role="img" aria-label="하루 총 명중 추이">
+    <svg viewBox="0 0 ${W} ${H}" class="trend-svg" role="img" aria-label="${opt.label}">
       ${grid}
       ${xLabels}
       <line class="crosshair" x1="0" x2="0" y1="${padT}" y2="${padT + ih}" visibility="hidden" />
@@ -233,13 +337,10 @@ function drawTrend(el, points) {
     cross.setAttribute("visibility", "visible");
     allDots.forEach((d) => d.classList.toggle("active", Number(d.dataset.i) === i));
     tip.hidden = false;
-    tip.innerHTML = `<strong>${formatDateKR(p.date)}</strong><span>${p.hits}중 / ${p.arrows}발 · ${formatRate(p.rate)}</span>
-      <span class="muted">${ROUNDS.map((n) => `${n}회 ${p.rounds[n]}`).join(" · ")}</span>`;
+    tip.innerHTML = `<strong>${formatDateKR(p.date)}</strong>${opt.tip(p)}`;
     const box = svg.getBoundingClientRect();
-    const px = (x(i) / W) * box.width;
-    const py = (y(p.hits) / H) * box.height;
-    tip.style.left = `${Math.min(Math.max(px, 90), box.width - 90)}px`;
-    tip.style.top = `${py}px`;
+    tip.style.left = `${Math.min(Math.max((x(i) / W) * box.width, 90), box.width - 90)}px`;
+    tip.style.top = `${(y(val(p)) / H) * box.height}px`;
   }
   function hide() {
     cross.setAttribute("visibility", "hidden");

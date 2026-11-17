@@ -2,6 +2,7 @@
 export const ROUNDS = [1, 2, 3];
 export const ARROWS_PER_ROUND = 5;
 export const MAX_ARROWS_PER_DAY = ROUNDS.length * ARROWS_PER_ROUND; // 15
+export const PRACTICE_MAX_ROUNDS = 50; // 연습 하루 최대 회차 (안전장치)
 
 // ── 날짜 (한국 시간 기준 YYYY-MM-DD) ─────────────
 export function todayKST() {

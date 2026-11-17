@@ -1,11 +1,13 @@
 // 기록 입력 — 날짜·선수 선택 → 회차별 명중 수 입력 (1→2→3 순서)
 import { watchPlayers } from "../data/players.js";
+import { renderPractice, modeTabsHTML } from "./practice.js";
 import { watchRecordsByDate, saveRound, updateHits, softDeleteRound, groupByPlayer } from "../data/records.js";
 import {
   todayKST, formatDateKR, ROUNDS, ARROWS_PER_ROUND, hitRate, formatRate, escapeHTML, toast,
 } from "../utils.js";
 
 export async function render(view, params) {
+  if (params.mode === "practice") return renderPractice(view, params);
   const today = todayKST();
   const state = {
     date: isValidDate(params.date) && params.date <= today ? params.date : today,
@@ -18,6 +20,7 @@ export async function render(view, params) {
   };
 
   view.innerHTML = `
+    <div id="mode-tabs">${modeTabsHTML("official", state.date, state.playerId)}</div>
     <section class="card">
       <div class="form-row">
         <label class="field">
@@ -197,6 +200,7 @@ export async function render(view, params) {
     const q = new URLSearchParams({ date: state.date });
     if (state.playerId) q.set("player", state.playerId);
     history.replaceState(null, "", `#/records?${q}`);
+    $("#mode-tabs").innerHTML = modeTabsHTML("official", state.date, state.playerId);
   }
 
   // ── 구독 ───────────────────────────────────

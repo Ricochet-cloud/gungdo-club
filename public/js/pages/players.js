@@ -1,6 +1,7 @@
 // 선수 관리 — 등록 / 수정 / 활동·비활성 전환 / 검색 / 기록 보기
 import { watchPlayers, createPlayer, updatePlayer, setPlayerStatus } from "../data/players.js";
 import { todayKST, escapeHTML, toast } from "../utils.js";
+import { trackWrite, settleLocal } from "../sync.js";
 
 export async function render(view) {
   const state = { players: [], search: "", filter: "active", loaded: false };
@@ -138,21 +139,12 @@ export async function render(view) {
 
     const btn = $("#dialog-submit");
     btn.disabled = true;
-    try {
-      if (id) {
-        await updatePlayer(id, data);
-        toast("선수 정보를 수정했습니다.");
-      } else {
-        await createPlayer(data);
-        toast(`${data.name} 선수를 등록했습니다.`);
-      }
-      dialog.close();
-    } catch (err) {
-      console.error(err);
-      errorEl.textContent = "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-    } finally {
-      btn.disabled = false;
-    }
+    // 서버 응답을 기다리지 않음 (오프라인이어도 폰에 먼저 저장 → 연결되면 전송)
+    const write = trackWrite(id ? updatePlayer(id, data) : createPlayer(data));
+    await settleLocal(write);
+    toast(id ? "선수 정보를 수정했습니다." : `${data.name} 선수를 등록했습니다.`);
+    dialog.close();
+    btn.disabled = false;
   });
 
   // ── 목록 버튼 (수정 / 상태 전환) ────────────
@@ -172,14 +164,8 @@ export async function render(view) {
         : `${player.name} 선수를 다시 활동 상태로 바꿀까요?`;
       if (!confirm(msg)) return;
       btn.disabled = true;
-      try {
-        await setPlayerStatus(id, toInactive ? "inactive" : "active");
-        toast(toInactive ? "비활성화했습니다." : "활동 상태로 바꿨습니다.");
-      } catch (err) {
-        console.error(err);
-        toast("상태를 바꾸지 못했습니다.", "error");
-        btn.disabled = false;
-      }
+      await settleLocal(trackWrite(setPlayerStatus(id, toInactive ? "inactive" : "active")));
+      toast(toInactive ? "비활성화했습니다." : "활동 상태로 바꿨습니다.");
     }
   });
 

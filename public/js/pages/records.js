@@ -1,6 +1,8 @@
 // 기록 입력 — 날짜·선수 선택 → 회차별 명중 수 입력 (1→2→3 순서)
 import { watchPlayers } from "../data/players.js";
 import { renderPractice, modeTabsHTML } from "./practice.js";
+import { trackWrite, settleLocal } from "../sync.js";
+import { mountWakeToggle } from "../wakelock.js";
 import { watchRecordsByDate, saveRound, updateHits, softDeleteRound, groupByPlayer } from "../data/records.js";
 import {
   todayKST, formatDateKR, ROUNDS, ARROWS_PER_ROUND, hitRate, formatRate, escapeHTML, toast,
@@ -20,7 +22,10 @@ export async function render(view, params) {
   };
 
   view.innerHTML = `
-    <div id="mode-tabs">${modeTabsHTML("official", state.date, state.playerId)}</div>
+    <div class="input-toolbar">
+      <div id="mode-tabs">${modeTabsHTML("official", state.date, state.playerId)}</div>
+      <button type="button" class="btn btn-ghost wake-btn" id="wake-btn" aria-pressed="false"></button>
+    </div>
     <section class="card">
       <div class="form-row">
         <label class="field">
@@ -314,26 +319,24 @@ export async function render(view, params) {
     }
   });
 
+  // 서버 응답을 기다리지 않음: 폰에 먼저 저장(즉시 화면 반영) → 연결되면 자동 전송
   async function run(task, successMsg) {
     state.busy = true;
     renderRounds();
-    try {
-      await task();
-      toast(successMsg);
-    } catch (err) {
-      console.error(err);
-      toast(err?.code === "permission-denied"
-        ? "저장이 거부되었습니다. 회차 순서나 권한을 확인해 주세요."
-        : "저장하지 못했습니다. 네트워크를 확인해 주세요.", "error");
-    } finally {
-      state.busy = false;
-      renderRounds();
-    }
+    const write = trackWrite(task());
+    await settleLocal(write);
+    if (navigator.onLine) toast(successMsg);
+    else toast(`${successMsg} (오프라인)`);
+    state.busy = false;
+    renderRounds();
   }
+
+  const releaseWake = mountWakeToggle($("#wake-btn"));
 
   return () => {
     unsubPlayers();
     unsubRecords?.();
+    releaseWake();
   };
 }
 

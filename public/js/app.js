@@ -5,6 +5,7 @@ import * as dashboard from "./pages/dashboard.js";
 import * as records from "./pages/records.js";
 import * as history from "./pages/history.js";
 import * as players from "./pages/players.js";
+import { initSyncBanner } from "./sync.js";
 
 const ROUTES = {
   dashboard: { title: "대시보드", page: dashboard },
@@ -64,6 +65,7 @@ onAuthStateChanged(auth, (user) => {
     return;
   }
   document.body.classList.remove("auth-pending");
+  initSyncBanner();
   if (!started) {
     started = true;
     window.addEventListener("hashchange", render);

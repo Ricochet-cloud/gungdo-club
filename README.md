@@ -50,6 +50,8 @@ gungdo-club/
 | 삭제 | soft delete (`deleted: true`, `deletedAt`). 실제 문서 삭제는 규칙으로 차단 |
 | 이름 변경 | 과거 기록의 `playerName`은 당시 이름 그대로 유지 |
 | 설정 메뉴 | MVP에서 제외. 로그아웃은 사이드바/상단에 배치 |
+| 오프라인 | Firestore 오프라인 저장(IndexedDB) 사용. 끊겨도 폰에 먼저 저장 → 연결되면 자동 전송. 상단에 대기 건수 표시 |
+| 화면 켜두기 | 기록 입력 화면에서 Wake Lock 토글 (iOS 16.4+) |
 | 연습 기록 | `practiceRecords`에 별도 저장. 회차 제한 없음(하루 최대 50), 5발 고정, 순위 미반영, 통계 분리 |
 
 ## 데이터 구조

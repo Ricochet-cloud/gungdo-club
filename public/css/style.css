@@ -83,7 +83,7 @@ a { color: inherit; text-decoration: none; }
 
 .main { flex: 1; margin-left: var(--sidebar-w); min-width: 0; }
 .topbar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 24px 32px 8px;
 }
 #logout-btn-mobile { display: none; }
@@ -510,4 +510,32 @@ button, a, .hit-btn, .chip, select, input { touch-action: manipulation; -webkit-
   .stat-value { font-size: 22px; }
   .summary-row strong { font-size: 20px; }
   .summary-4 strong { font-size: 18px; }
+}
+
+/* ============ 연결 상태 배너 / 화면 켜두기 ============ */
+.sync-banner {
+  display: inline-flex; align-items: center; gap: 7px; margin-left: auto; margin-right: 10px;
+  padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.sync-short { display: none; }
+.sync-banner[hidden] { display: none; }
+.sync-banner.offline { background: #fbefd3; color: #7a5410; border: 1px solid #ecd49c; }
+.sync-banner.syncing { background: var(--green-soft); color: var(--green); border: 1px solid #c6d6c7; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.sync-banner.syncing .sync-dot { animation: syncpulse 1s ease-in-out infinite; }
+@keyframes syncpulse { 50% { opacity: 0.25; } }
+
+.input-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.wake-btn { font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.wake-btn.on { background: #fff7e0; border-color: #e8cf86; color: #7a5410; }
+.wake-ico { font-size: 15px; }
+
+@media (max-width: 720px) {
+  .input-toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .input-toolbar #mode-tabs { width: 100%; }
+  .wake-btn { justify-content: center; min-height: 42px; }
+  .sync-banner { padding: 5px 10px; font-size: 12px; margin-right: 8px; }
+  .sync-long { display: none; }
+  .sync-short { display: inline; }
 }

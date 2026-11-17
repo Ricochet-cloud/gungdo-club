@@ -7,6 +7,8 @@ import {
   todayKST, formatDateKR, ARROWS_PER_ROUND, PRACTICE_MAX_ROUNDS, formatRate,
   escapeHTML, toast, displayName,
 } from "../utils.js";
+import { trackWrite, settleLocal } from "../sync.js";
+import { mountWakeToggle } from "../wakelock.js";
 
 /** 기록 입력 화면 상단 공식/연습 전환 탭 (records.js 와 공용) */
 export function modeTabsHTML(mode, date, playerId) {
@@ -36,7 +38,10 @@ export async function renderPractice(view, params) {
   };
 
   view.innerHTML = `
-    <div id="mode-tabs"></div>
+    <div class="input-toolbar">
+      <div id="mode-tabs"></div>
+      <button type="button" class="btn btn-ghost wake-btn" id="wake-btn" aria-pressed="false"></button>
+    </div>
     <section class="card">
       <div class="form-row">
         <label class="field">
@@ -250,16 +255,12 @@ export async function renderPractice(view, params) {
 
   async function run(task, msg) {
     state.busy = true; renderBody();
-    try {
-      await task();
-      toast(msg);
-    } catch (err) {
-      console.error(err);
-      toast(err?.code === "permission-denied" ? "저장이 거부되었습니다. 보안 규칙을 확인해 주세요." : "저장하지 못했습니다.", "error");
-    } finally {
-      state.busy = false; renderBody();
-    }
+    const write = trackWrite(task());
+    await settleLocal(write);
+    toast(navigator.onLine ? msg : `${msg} (오프라인)`);
+    state.busy = false; renderBody();
   }
 
-  return () => { unsubPlayers(); unsubRec?.(); };
+  const releaseWake = mountWakeToggle($("#wake-btn"));
+  return () => { unsubPlayers(); unsubRec?.(); releaseWake(); };
 }

@@ -33,10 +33,10 @@ async function renderByDate(body, date, today) {
   body.innerHTML = `
     <section class="card">
       <div class="date-nav">
-        <button type="button" class="btn btn-ghost btn-sm" id="prev-day" aria-label="이전 날">‹</button>
+        <button type="button" class="btn btn-ghost nav-arrow" id="prev-day" aria-label="이전 날">‹</button>
         <input type="date" id="hist-date" value="${date}" max="${today}" />
-        <button type="button" class="btn btn-ghost btn-sm" id="next-day" aria-label="다음 날" ${date >= today ? "disabled" : ""}>›</button>
-        ${date !== today ? `<button type="button" class="btn btn-ghost btn-sm" id="to-today">오늘</button>` : ""}
+        <button type="button" class="btn btn-ghost nav-arrow" id="next-day" aria-label="다음 날" ${date >= today ? "disabled" : ""}>›</button>
+        <button type="button" class="btn btn-ghost" id="to-today" ${date === today ? "disabled" : ""}>오늘</button>
       </div>
       <h2 class="date-title">${formatDateKR(date)}</h2>
     </section>
@@ -47,7 +47,7 @@ async function renderByDate(body, date, today) {
       <div class="card-head"><h2>순위</h2><span class="muted small">3회차 완료 선수만 순위 부여</span></div>
       <div class="table-wrap">
         <table class="rank-table">
-          <thead><tr><th>순위</th><th>선수</th><th>1회</th><th>2회</th><th>3회</th><th>명중</th><th>명중률</th></tr></thead>
+          <thead><tr><th>순위</th><th>선수</th><th>1회</th><th>2회</th><th>3회</th><th>명중</th><th class="col-rate">명중률</th></tr></thead>
           <tbody id="day-body"><tr><td colspan="7" class="empty">불러오는 중…</td></tr></tbody>
         </table>
       </div>
@@ -198,13 +198,13 @@ async function renderByPlayer(body, playerId, kind) {
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>날짜별 기록</h2>${best ? `<span class="muted small">최고 ${best.hits}중 · ${best.date}</span>` : ""}</div>
+      <div class="card-head"><h2>날짜별 기록</h2>${best ? `<span class="muted small">최고 ${best.hits}중 · ${shortDate(best.date)}</span>` : ""}</div>
       <div class="table-wrap">
         <table class="rank-table">
           <thead><tr><th>날짜</th><th>1회</th><th>2회</th><th>3회</th><th>명중</th><th>명중률</th></tr></thead>
           <tbody>${days.length ? days.map((d) => `
             <tr class="${d.complete ? "" : "row-pending"} ${best && d.date === best.date ? "row-best" : ""}">
-              <td><a class="name-link" href="#/history?tab=date&date=${d.date}">${d.date}</a></td>
+              <td><a class="name-link" href="#/history?tab=date&date=${d.date}">${shortDate(d.date)}</a></td>
               ${ROUNDS.map((n) => `<td class="round-cell">${d.rounds[n] ?? '<span class="muted">·</span>'}</td>`).join("")}
               <td><strong>${d.hits}</strong>${d.complete ? "" : ' <span class="badge">진행중</span>'}</td>
               <td>${formatRate(d.rate)}</td>
@@ -269,10 +269,10 @@ async function renderPlayerPractice(out, player) {
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>날짜별 연습</h2>${bestRate ? `<span class="muted small">최고 ${formatRate(bestRate.rate)} · ${bestRate.date}</span>` : ""}</div>
+      <div class="card-head"><h2>날짜별 연습</h2>${bestRate ? `<span class="muted small">최고 ${formatRate(bestRate.rate)} · ${shortDate(bestRate.date)}</span>` : ""}</div>
       <ul class="status-list">${days.length ? days.map((d) => `
         <li class="practice-row">
-          <a class="name-link" href="#/history?tab=date&date=${d.date}">${d.date}</a>
+          <a class="name-link" href="#/history?tab=date&date=${d.date}">${shortDate(d.date)}</a>
           <span class="muted">${d.rounds.length}회차 · ${d.hits}/${d.arrows}발</span>
           <strong>${formatRate(d.rate)}</strong>
           <span class="mini-chips">${d.rounds.map((r) => `<span class="mini-chip hits-${r.hits}">${r.hits}</span>`).join("")}</span>
@@ -295,7 +295,9 @@ function drawTrend(el, points, opt) {
     el.innerHTML = `<div class="empty">${opt.empty}</div>`;
     return;
   }
-  const W = 640, H = 220, padL = 36, padR = 16, padT = 16, padB = 28;
+  // 실제 표시 폭에 맞춰 그려서 모바일에서도 글자 크기가 그대로 유지되게
+  const W = Math.max(280, Math.round(el.clientWidth || 640));
+  const H = W < 480 ? 200 : 220, padL = 36, padR = 14, padT = 16, padB = 28;
   const iw = W - padL - padR, ih = H - padT - padB;
   const x = (i) => padL + (points.length === 1 ? iw / 2 : (i / (points.length - 1)) * iw);
   const y = (v) => padT + ih - (v / opt.max) * ih;
@@ -351,7 +353,19 @@ function drawTrend(el, points, opt) {
     r.addEventListener("pointerenter", () => show(Number(r.dataset.i)));
     r.addEventListener("pointerdown", () => show(Number(r.dataset.i)));
   });
-  svg.addEventListener("pointerleave", hide);
+  // 마우스만 벗어날 때 닫기 (터치는 손을 떼면 pointerleave 가 발생해 바로 닫혀버림)
+  svg.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hide(); });
+  // 모바일: 그래프 바깥을 누르면 툴팁 닫기
+  const outside = (e) => { if (!el.isConnected) return document.removeEventListener("pointerdown", outside); if (!el.contains(e.target)) hide(); };
+  document.addEventListener("pointerdown", outside);
+}
+
+/** '2026-11-16' → '11/16 (월)' (올해가 아니면 '25/11/16 (일)') */
+function shortDate(ymd) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const day = ["일", "월", "화", "수", "목", "금", "토"][new Date(y, m - 1, d).getDay()];
+  const thisYear = Number(todayKST().slice(0, 4));
+  return `${y === thisYear ? "" : `${String(y).slice(2)}/`}${m}/${d} (${day})`;
 }
 
 function stat(label, value, unit) {

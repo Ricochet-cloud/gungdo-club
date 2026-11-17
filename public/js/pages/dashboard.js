@@ -190,7 +190,7 @@ export function rankingRows(ranking, players, { withRounds = false } = {}) {
         ${rounds}
         <td><strong>${p.hits}</strong></td>
         ${withRounds ? "" : `<td>${p.arrows}</td>`}
-        <td>${formatRate(p.rate)}</td>
+        <td class="${withRounds ? "col-rate" : ""}">${formatRate(p.rate)}</td>
       </tr>`;
   }).join("");
 }

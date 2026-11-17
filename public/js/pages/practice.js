@@ -135,13 +135,13 @@ export async function renderPractice(view, params) {
         ${editing && editing.round === last?.round ? `<button type="button" class="btn btn-ghost btn-sm danger-text" data-act="delete">${editing.round}회차 삭제</button>` : ""}
         ${!editing && last ? `<button type="button" class="btn btn-ghost btn-sm" data-act="undo">↶ 방금 회차(${last.round}회차) 삭제</button>` : ""}
       </div>
-      <div class="chips" aria-label="회차별 기록">${chips}</div>
       <div class="summary-row summary-4">
         <div><span class="muted">회차</span><strong>${rounds.length}</strong></div>
         <div><span class="muted">명중</span><strong>${data.hits}</strong></div>
         <div><span class="muted">발수</span><strong>${data.arrows}</strong></div>
         <div><span class="muted">명중률</span><strong>${formatRate(data.rate)}</strong></div>
-      </div>`;
+      </div>
+      <div class="chips" aria-label="회차별 기록">${chips}</div>`;
   }
 
   // ── 오늘 연습한 선수 ───────────────────────

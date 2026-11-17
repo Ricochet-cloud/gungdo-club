@@ -42,6 +42,7 @@ export async function render(view, params) {
       </div>
       <div class="round-list" id="round-list"></div>
       <div class="summary-row" id="summary"></div>
+      <div id="next-wrap"></div>
     </section>
 
     <section class="card">
@@ -105,6 +106,7 @@ export async function render(view, params) {
       badge.hidden = true;
       listEl.innerHTML = `<div class="empty">선수를 선택하면 회차를 입력할 수 있습니다.</div>`;
       summaryEl.hidden = true;
+      $("#next-wrap").innerHTML = "";
       return;
     }
 
@@ -147,6 +149,25 @@ export async function render(view, params) {
       <div><span class="muted">총 명중</span><strong>${entered.length ? hits : "—"}</strong></div>
       <div><span class="muted">총 발수</span><strong>${entered.length ? arrows : "—"}</strong></div>
       <div><span class="muted">명중률</span><strong>${formatRate(hitRate(hits, arrows))}</strong></div>`;
+
+    // 3회차 완료 → 다음 미완료 선수로 바로 이동
+    const next = complete ? nextIncomplete(player.id) : null;
+    $("#next-wrap").innerHTML = complete
+      ? next
+        ? `<button type="button" class="btn btn-primary btn-block next-btn" data-next="${next.id}">다음 선수: ${escapeHTML(displayName(next))} →</button>`
+        : `<p class="all-done">🎯 모든 선수 입력 완료</p>`
+      : "";
+  }
+
+  function nextIncomplete(currentId) {
+    const grouped = byPlayer();
+    const list = targetPlayers()
+      .filter((p) => p.status === "active")
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    const undone = (p) => Object.keys(grouped[p.id] || {}).length < ROUNDS.length;
+    const idx = list.findIndex((p) => p.id === currentId);
+    const ordered = [...list.slice(idx + 1), ...list.slice(0, Math.max(idx, 0))];
+    return ordered.find(undone) || null;
   }
 
   // ── 렌더: 입력 현황 ────────────────────────
@@ -237,6 +258,15 @@ export async function render(view, params) {
     state.playerId = playerSelect.value;
     syncURL();
     renderAll();
+  });
+
+  $("#next-wrap").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-next]");
+    if (!b) return;
+    state.playerId = b.dataset.next;
+    syncURL();
+    renderAll();
+    $("#round-card").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   $("#status-list").addEventListener("click", (e) => {

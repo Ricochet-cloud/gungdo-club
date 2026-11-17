@@ -2,11 +2,14 @@
 
 국궁 동호회 일일 활쏘기 기록 · 순위 관리 웹 (HTML / CSS / JS + Firebase)
 
+배포: GitHub Pages → https://ricochet-cloud.github.io/gungdo-club/
+
 ## 폴더 구조
 
 ```
 gungdo-club/
-├─ firebase.json            Hosting + Firestore 설정
+├─ .github/workflows/      GitHub Pages 자동 배포 (public/ 폴더)
+├─ firebase.json            Firestore 규칙·인덱스 배포 설정
 ├─ .firebaserc              Firebase 프로젝트 ID
 ├─ firestore.rules          보안 규칙 (관리자 UID, 유효성, 회차 순서, soft delete)
 ├─ firestore.indexes.json   복합 인덱스
@@ -30,7 +33,9 @@ gungdo-club/
 3. UID를 `firebase-config.js`의 `ADMIN_UID`와 `firestore.rules`의 `'ADMIN_UID'` 두 곳에 입력
 4. Firestore Database 생성 (리전: asia-northeast3 서울 권장)
 5. `.firebaserc`의 프로젝트 ID 수정
-6. 배포: `firebase deploy`
+6. Authentication → 설정 → 승인된 도메인에 `ricochet-cloud.github.io` 추가
+7. 보안 규칙·인덱스 배포: `firebase deploy --only firestore`
+8. GitHub 저장소 Settings → Pages → Source: **GitHub Actions** → 이후 main에 push할 때마다 자동 배포
 
 로컬 확인: `npx serve public` 등으로 띄우기 (ES 모듈이라 파일 더블클릭으로는 안 열림)
 
